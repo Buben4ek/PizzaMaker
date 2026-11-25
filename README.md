@@ -1,3 +1,3 @@
 # PizzaMaker
-# Бешенцев Иван Ильич 
 # Группа ИИ 72
+# Beshentsev
