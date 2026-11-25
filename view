@@ -1,0 +1,181 @@
+def decor_func(input_func):
+    def outer_func(*args, **kwargs):
+        print("\n" + "═" * 45)
+        res = input_func(*args, **kwargs)
+        print("═" * 45 + "\n")
+        return res
+
+    return outer_func
+
+
+ADMIN_PASSWORD = "123"
+TOPPING_PRICE = 50  # Цена за каждый доп. топпинг в кастомной пицце
+
+PIZZA_MENU = {
+    "1": {"name": "Маргарита", "price": 450, "ingredients": ["тесто", "соус", "сыр"]},
+    "2": {"name": "Пепперони", "price": 550, "ingredients": ["тесто", "соус", "сыр", "пепперони"]},
+    "3": {"name": "Кастомная", "price": 400, "ingredients": ["тесто", "соус", "сыр"]}
+}
+DRINKS_MENU = {
+    "1": {"name": "Кола", "price": 120, "age_limit": 0},
+    "2": {"name": "Энергетик", "price": 180, "age_limit": 18},
+    "0": {"name": "Без напитка", "price": 0, "age_limit": 0}
+}
+
+
+@decor_func
+def show_welcome():
+    print("🍕 РОБОТ ПИЦЦА-МЕЙКЕР ЗАПУЩЕН 🍕")
+
+
+@decor_func
+def show_menu():
+    print("📋 ГЛАВНОЕ МЕНЮ:\n  1. 🍕 Меню и новый заказ\n  2. 🔐 Админ-панель и статус\n  0. 🔌 Выход")
+
+
+@decor_func
+def show_status(state):
+    print(f"🤖 Статус: {state['status']} | Печь: {state['temperature']}°C | Заказов: {state['orders_completed']}")
+    print("📦 Запасы:", ", ".join(f"{k}: {v}" for k, v in state["ingredients"].items()))
+    print("📜 Последние 5 заказов:")
+    for o in state["order_history"][-5:] or ["  Заказов пока нет"]:
+        print(f"  #{o['id']}: {', '.join(o['pizza'])} + {o['drink']} | {o['total']} ₽ ({o['payment']})" if isinstance(o,
+                                                                                                                      dict) else o)
+
+
+def ask_menu_choice():
+    return input("👉 Ваш выбор: ").strip()
+
+
+def ask_toppings(available_toppings):
+    raw = input(
+        f"🧀 Топпинги (+{TOPPING_PRICE} ₽/шт: {', '.join(available_toppings)}) через запятую или Enter:\n> ").strip().lower()
+    return [i.strip() for i in raw.split(",") if i.strip()] if raw else []
+
+
+def show_message(message):
+    print(f"[ℹ️ Информация] - {message}")
+
+
+def show_error(error_message):
+    print(f"[❌ Ошибка] - {error_message}")
+
+
+@decor_func
+def show_finished_pizza(ingredients_list, drink="Без напитка", total_price=0):
+    print(
+        f"🎉 ВАШ ЗАКАЗ ГОТОВ!\n🍕 Пицца: {', '.join(ingredients_list)}\n🥤 Напиток: {drink}\n💰 Итого к оплате: {total_price} ₽")
+
+
+def edit_menu(state):
+    target = input(
+        "Что изменить? (1 - Добавить пиццу, 2 - Удалить пиццу, 3 - Добавить напиток, 4 - Удалить напиток): ").strip()
+    if target == "1":
+        name = input("Название пиццы: ").strip()
+        price_raw = input("Цена пиццы (₽): ").strip()
+        price = int(price_raw) if price_raw.isdigit() else 500
+        ingr = [i.strip() for i in input("Ингредиенты через запятую: ").lower().split(",") if i.strip()] or ["тесто",
+                                                                                                             "соус",
+                                                                                                             "сыр"]
+        key = str(max([int(k) for k in PIZZA_MENU if k.isdigit()], default=0) + 1)
+        PIZZA_MENU[key] = {"name": name, "price": price, "ingredients": ingr}
+        for i in ingr: state["ingredients"].setdefault(i, 5)
+        show_message(f"Пицца «{name}» ({price} ₽) добавлена!")
+    elif target == "2":
+        removed = PIZZA_MENU.pop(input("Номер пиццы для удаления: ").strip(), None)
+        show_message(f"Удалено: {removed['name']}") if removed else show_error("Не найден номер.")
+    elif target == "3":
+        name = input("Название напитка: ").strip()
+        price_raw = input("Цена напитка (₽): ").strip()
+        price = int(price_raw) if price_raw.isdigit() else 150
+        age = 18 if input("18+? (да/нет): ").strip().lower() == "да" else 0
+        key = str(max([int(k) for k in DRINKS_MENU if k.isdigit()], default=0) + 1)
+        DRINKS_MENU[key] = {"name": name, "price": price, "age_limit": age}
+        state["ingredients"].setdefault(name.lower(), 5)
+        show_message(f"Напиток «{name}» ({price} ₽) добавлен!")
+    elif target == "4":
+        k = input("Номер напитка для удаления: ").strip()
+        removed = DRINKS_MENU.pop(k, None) if k != "0" else None
+        show_message(f"Удалено: {removed['name']}") if removed else show_error("Нельзя удалить.")
+
+
+if __name__ == "__main__":
+    robot_state = {
+        "status": "Готов к работе", "temperature": 320, "orders_completed": 0, "order_history": [],
+        "ingredients": {"тесто": 10, "соус": 10, "сыр": 10, "пепперони": 5, "грибы": 5, "кола": 5, "энергетик": 3}
+    }
+    available_toppings = ["сыр", "пепперони", "грибы", "оливки"]
+    show_welcome()
+
+    while True:
+        show_menu()
+        choice = ask_menu_choice()
+
+        if choice == "1":
+            print("\n🍕 ПИЦЦЫ:", *[f"[{k}] {v['name']} — {v['price']} ₽ ({', '.join(v['ingredients'])})" for k, v in
+                                  PIZZA_MENU.items()], sep="\n  ")
+            print("🥤 НАПИТКИ:", *[f"[{k}] {v['name']} — {v['price']} ₽{' [18+]' if v['age_limit'] else ''}" for k, v in
+                                  DRINKS_MENU.items()], sep="\n  ")
+
+            p_choice = input("\n👉 Номер пиццы (или 0 для отмены): ").strip()
+            if p_choice == "0": continue
+            if p_choice not in PIZZA_MENU:
+                show_error("Нет такой пиццы!")
+                continue
+
+            pizza = PIZZA_MENU[p_choice]
+            ingredients_list = list(pizza["ingredients"])
+            total_price = pizza["price"]
+
+            if pizza["name"] == "Кастомная":
+                extra = ask_toppings(available_toppings)
+                ingredients_list.extend(extra)
+                total_price += len(extra) * TOPPING_PRICE
+
+            d_choice = input("👉 Номер напитка: ").strip()
+            if d_choice not in DRINKS_MENU:
+                show_error("Нет такого напитка!")
+                continue
+            drink = DRINKS_MENU[d_choice]
+
+            if drink["age_limit"] >= 18:
+                age = input("🔞 Введите ваш возраст: ").strip()
+                if not age.isdigit() or int(age) < 18:
+                    show_error("Продажа только с 18 лет!")
+                    continue
+
+            total_price += drink["price"]
+
+            # 1. Выдаем готовый заказ с итоговой суммой
+            show_finished_pizza(ingredients_list, drink["name"], total_price)
+
+            # 2. В самом конце проводим оплату
+            pay = "Наличные" if input(
+                f"💳 К оплате {total_price} ₽. Способ (1 - Нал, 2 - Безнал): ").strip() == "1" else "Безнал"
+            show_message(f"Оплата {total_price} ₽ ({pay}) прошла успешно! Приятного аппетита!")
+
+            # 3. Сохраняем в историю
+            robot_state["orders_completed"] += 1
+            robot_state["order_history"].append({
+                "id": robot_state["orders_completed"],
+                "pizza": ingredients_list,
+                "drink": drink["name"],
+                "total": total_price,
+                "payment": pay
+            })
+
+        elif choice == "2":
+            if input("🔑 Пароль админа (123): ").strip() != ADMIN_PASSWORD:
+                show_error("Неверный пароль!")
+                continue
+            show_status(robot_state)
+            admin_cmd = input("⚙️ Админка: 1 - Пополнить запасы (+5) | 2 - Изменить меню | 0 - Назад: ").strip()
+            if admin_cmd == "1":
+                for k in robot_state["ingredients"]: robot_state["ingredients"][k] += 5
+                show_message("Запасы пополнены!")
+            elif admin_cmd == "2":
+                edit_menu(robot_state)
+
+        elif choice == "0":
+            show_message("Выключение робота.")
+            break
